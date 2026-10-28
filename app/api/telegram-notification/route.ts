@@ -8,12 +8,25 @@ const recentRequests = new Map<string, number>()
 
 function isSameOrigin(request: Request) {
   const origin = request.headers.get("origin")
-  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host")
-
-  if (!origin || !host) return false
+  if (!origin) return false
 
   try {
-    return new URL(origin).host.toLowerCase() === host.split(",")[0].trim().toLowerCase()
+    const originUrl = new URL(origin)
+    if (originUrl.protocol !== "https:" && originUrl.protocol !== "http:") return false
+
+    const forwardedHosts = [
+      request.headers.get("x-forwarded-host"),
+      request.headers.get("host"),
+      request.headers.get("x-vercel-deployment-url"),
+      process.env.VERCEL_URL,
+    ]
+
+    const allowedHosts = forwardedHosts
+      .flatMap((value) => value?.split(",") ?? [])
+      .map((value) => value.trim().replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase())
+      .filter(Boolean)
+
+    return allowedHosts.includes(originUrl.host.toLowerCase())
   } catch {
     return false
   }
